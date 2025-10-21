@@ -1,0 +1,140 @@
+# GitLeaks configuration for Prompt Testing Lab
+# Detects secrets and sensitive information in git repositories
+
+title = "GitLeaks config for Prompt Testing Lab"
+
+[extend]
+# path = "path/to/base/config"
+
+[allowlist]
+description = "Allowlist for false positives"
+paths = [
+  ".env.example",
+  "*.tfvars.example",
+  "README.md",
+  "docs/",
+  ".gitleaks.toml"
+]
+regexes = [
+  "your-.*-here",
+  "example-.*",
+  "test-.*-key",
+  "fake-.*",
+  "dummy-.*",
+  "placeholder-.*"
+]
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS Access Key ID"
+regex = '''(?i)aws(.{0,20})?(?-i)['\"][0-9a-zA-Z]{16,128}['\"]'''
+tags = ["key", "AWS"]
+
+[[rules]]
+id = "aws-secret-access-key" 
+description = "AWS Secret Access Key"
+regex = '''(?i)aws(.{0,20})?(?-i)['\"][0-9a-zA-Z/+=]{16,128}['\"]'''
+tags = ["key", "AWS"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+tags = ["key", "OpenAI"]
+
+[[rules]]
+id = "groq-api-key"
+description = "Groq API Key"
+regex = '''gsk_[a-zA-Z0-9]{52}'''
+tags = ["key", "Groq"]
+
+[[rules]]
+id = "github-token"
+description = "GitHub Token"
+regex = '''gh[pousr]_[A-Za-z0-9_]{36,255}'''
+tags = ["key", "GitHub"]
+
+[[rules]]
+id = "vercel-token"
+description = "Vercel Token"
+regex = '''(?i)vercel(.{0,20})?['\"][a-zA-Z0-9]{24}['\"]'''
+tags = ["key", "Vercel"]
+
+[[rules]]
+id = "supabase-key"
+description = "Supabase Key"
+regex = '''eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*'''
+tags = ["key", "Supabase"]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT Token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*'''
+tags = ["key", "JWT"]
+
+[[rules]]
+id = "private-key"
+description = "Private Key"
+regex = '''-----BEGIN (?:RSA )?PRIVATE KEY-----'''
+tags = ["key", "private"]
+
+[[rules]]
+id = "database-url"
+description = "Database URL"
+regex = '''(?i)(database_url|db_url|connection_string)(.{0,20})?['\"]?[a-z]+://[^\s'"]+['\"]?'''
+tags = ["database", "connection"]
+
+[[rules]]
+id = "redis-url"
+description = "Redis URL"
+regex = '''(?i)redis(.{0,20})?['\"]?redis://[^\s'"]+['\"]?'''
+tags = ["database", "redis"]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey|api[_-]?token|apitoken|access[_-]?token|auth[_-]?token|secret[_-]?key)(.{0,20})?['\"][a-zA-Z0-9_-]{16,}['\"]'''
+tags = ["key", "API"]
+
+[[rules]]
+id = "password"
+description = "Password"
+regex = '''(?i)(password|passwd|pwd)(.{0,20})?['\"][^\s'"]{8,}['\"]'''
+tags = ["password"]
+
+[[rules]]
+id = "email-password"
+description = "Email and Password"
+regex = '''[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(.{0,50})?password'''
+tags = ["password", "email"]
+
+[[rules]]
+id = "slack-webhook"
+description = "Slack Webhook"
+regex = '''https://hooks\.slack\.com/services/[A-Za-z0-9+/]{44,46}'''
+tags = ["webhook", "slack"]
+
+[[rules]]
+id = "discord-webhook"
+description = "Discord Webhook"
+regex = '''https://discord(?:app)?\.com/api/webhooks/[0-9]{18}/[A-Za-z0-9\-_]{68}'''
+tags = ["webhook", "discord"]
+
+[[rules]]
+id = "sentry-dsn"
+description = "Sentry DSN"
+regex = '''https://[a-f0-9]{32}@[a-z0-9]+\.ingest\.sentry\.io/[0-9]+'''
+tags = ["sentry", "dsn"]
+
+[entropy]
+# Entropy detection for random strings
+min = 3.5
+max = 8.0
+group = 1
+
+[[rules]]
+id = "entropy-check"
+description = "High entropy string"
+regex = '''['\"][a-zA-Z0-9+/=]{32,}['\"]'''
+entropy = 4.0
+tags = ["entropy"]

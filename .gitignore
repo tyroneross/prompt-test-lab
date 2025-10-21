@@ -1,0 +1,80 @@
+# Environment variables - NEVER COMMIT
+.env
+.env.*
+!.env.example
+!.env.test.example
+!.env.production.example
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+.playwright/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+dev.db
+test.db
+
+# Prisma
+prisma/.env
+prisma/migrations/**/migration.sql.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Claude Memory (may contain sensitive data)
+.claude/
+
+# Secrets and API keys
+*.key
+*.pem
+secrets.json
+credentials.json
+
+# Production config
+.vercel
+.netlify

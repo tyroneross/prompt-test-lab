@@ -1,0 +1,19 @@
+# Security Scan Results
+
+## Known False Positives
+
+### node-gyp test_gyp.py Command Injection (Line 205)
+- **File:** node_modules/.pnpm/node-gyp@8.4.1/node_modules/node-gyp/gyp/test_gyp.py
+- **Issue:** Command injection vulnerability in test file
+- **Risk:** LOW - This is a test file not used in production
+- **Action:** Ignore - Test files in transitive dependencies don't affect production
+- **Justification:** The file is not referenced in package.json and is not executed during normal operation
+
+## Other Vulnerabilities Found
+- esbuild <=0.24.2 (moderate) - Development server vulnerability
+- cookie <0.7.0 (low) - Cookie parsing vulnerability
+
+## Recommendations
+1. Update esbuild to >=0.25.0
+2. Update cookie to >=0.7.0
+3. Monitor for updates to sqlite3 that might resolve the node-gyp dependency

@@ -1,0 +1,742 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Project relationships
+  projectMemberships ProjectMember[]
+  ownedProjects      Project[]       @relation("ProjectOwner")
+
+  // Activity tracking
+  testRuns TestRun[]
+
+  // Deployment relationships
+  deployments       Deployment[]        @relation("DeployedBy")
+  deploymentActions DeploymentHistory[] @relation("DeploymentActions")
+  
+  // Cost tracking
+  costTracking CostTracking[] @relation("UserCosts")
+  billing      UserBilling?
+
+  // Integration relationships
+  createdIntegrations     AppIntegration[]      @relation("CreatedIntegrations")
+  createdPipelines        TestPipeline[]        @relation("CreatedPipelines")
+  executedPipelines       PipelineExecution[]   @relation("ExecutedPipelines")
+  createdDependencies     Dependency[]          @relation("CreatedDependencies")
+  createdUpdatePlans      UpdatePlan[]          @relation("CreatedUpdatePlans")
+  executedUpdatePlans     UpdatePlan[]          @relation("ExecutedUpdatePlans")
+  createdDeploymentPlans  DeploymentPlan[]      @relation("CreatedDeploymentPlans")
+  executedDeployments     DeploymentExecution[] @relation("ExecutedDeployments")
+  deploymentApprovals     DeploymentApproval[]  @relation("DeploymentApprovals")
+  requestedApprovals      ApprovalRequest[]     @relation("RequestedApprovals")
+  initiatedSyncs          SyncOperation[]       @relation("InitiatedSyncs")
+  createdWebhooks         WebhookSubscription[] @relation("CreatedWebhooks")
+
+  @@map("users")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  settings    String? // Project-specific settings JSON (default models, etc.)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Ownership
+  ownerId String
+  owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Members
+  members ProjectMember[]
+
+  // Project content
+  prompts  Prompt[]
+  testRuns TestRun[]
+  ApiKey   ApiKey[]
+
+  // Deployment and environment management
+  environments Environment[]
+  costTracking CostTracking[]
+
+  // Integration relationships
+  appIntegrations   AppIntegration[]
+  testPipelines     TestPipeline[]
+  dependencies      Dependency[]
+  updatePlans       UpdatePlan[]
+  deploymentPlans   DeploymentPlan[]
+  approvalRequests    ApprovalRequest[]
+  syncOperations      SyncOperation[]
+  webhookDeliveries   WebhookDelivery[]
+  webhookSubscriptions WebhookSubscription[]
+
+  @@map("projects")
+}
+
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  role      String @default(MEMBER)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model Prompt {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  content      String // The actual prompt text
+  version      Int      @default(1)
+  isArchived   Boolean  @default(false)
+  tags         String   // JSON array of tags for organization
+  metadata     String? // Additional metadata JSON (temperature, max_tokens, etc.)
+  outputSchema String? // Expected output structure/schema JSON for result display
+  outputFormat String? // Expected format: "json", "text", "markdown", "structured"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Versioning - track parent prompt for versions
+  parentId String?
+  parent   Prompt?  @relation("PromptVersions", fields: [parentId], references: [id])
+  versions Prompt[] @relation("PromptVersions")
+
+  // Test runs using this prompt
+  testRuns TestRun[]
+
+  // Deployments of this prompt
+  deployments    Deployment[]    @relation
+  impactAnalysis ImpactAnalysis[] @relation("ImpactBaseline")
+
+  // Integration relationships
+  pipelineExecutions         PipelineExecution[] @relation("PipelinePrompts")
+  baselinePipelineExecutions PipelineExecution[] @relation("PipelineBaselines")
+  deploymentPlans            DeploymentPlan[]    @relation("DeploymentPlans")
+  approvalRequests           ApprovalRequest[]   @relation("ApprovalRequests")
+
+  @@index([projectId, isArchived])
+  @@index([parentId])
+  @@map("prompts")
+}
+
+
+model TestRun {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      String @default(PENDING)
+  config      String // Test configuration (models to test, eval criteria, etc.)
+  metadata    String? // Additional metadata
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  promptId  String
+  prompt    Prompt  @relation(fields: [promptId], references: [id])
+
+  // Test results
+  responses TestResponse[]
+  metrics   TestMetric[]
+
+  @@index([projectId, status])
+  @@index([userId])
+  @@map("test_runs")
+}
+
+model TestResponse {
+  id              String   @id @default(cuid())
+  modelProvider   String // "openai", "groq", "anthropic", "local", etc.
+  modelName       String // "gpt-4", "llama2-70b", etc.
+  input           String // The actual input sent to the model
+  output          String // The model's response
+  parsedOutput    String? // Parsed output based on expected schema
+  outputStructure String? // Structure analysis of the output for display
+  tokenUsage      String? // Token usage stats
+  latencyMs       Int? // Response latency
+  cost            Float? // Cost in USD
+  error           String? // Error message if the request failed
+  rawResponse     String? // Full raw response from the model
+  evaluationData  String? // Results from evaluation plugins
+  createdAt       DateTime @default(now())
+
+  // Relationships
+  testRunId String
+  testRun   TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId])
+  @@index([modelProvider, modelName])
+  @@map("test_responses")
+}
+
+model TestMetric {
+  id        String   @id @default(cuid())
+  name      String // "accuracy", "relevance", "cost_efficiency", etc.
+  value     Float // Numeric value of the metric
+  unit      String? // Unit of measurement ("percentage", "dollars", "seconds", etc.)
+  metadata  String? // Additional context about how this metric was calculated
+  createdAt DateTime @default(now())
+
+  // Relationships
+  testRunId String
+  testRun   TestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@index([testRunId, name])
+  @@map("test_metrics")
+}
+
+// Plugin system for extensible evaluations
+model EvaluationPlugin {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  version     String
+  description String?
+  config      String // Plugin configuration schema
+  code        String? // Plugin code (for custom evaluations)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("evaluation_plugins")
+}
+
+// Queue management for test execution
+model QueueJob {
+  id          String    @id @default(cuid())
+  type        String // "test_run", "batch_test", "prompt_sync", etc.
+  data        String // Job payload
+  priority    Int       @default(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  status      String    @default("pending") // "pending", "active", "completed", "failed", "cancelled"
+  error       String?
+  metadata    String? // Additional job metadata (timeout, scheduleAt, etc.)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime?
+
+  @@index([status, priority])
+  @@index([type])
+  @@map("queue_jobs")
+}
+
+// Recurring job management
+model RecurringJob {
+  id        String   @id @default(cuid())
+  type      String // Job type to execute
+  data      String // Job data template
+  interval  Int // Interval in milliseconds
+  priority  Int      @default(0)
+  enabled   Boolean  @default(true)
+  nextRun   DateTime
+  lastRun   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled, nextRun])
+  @@index([type])
+  @@map("recurring_jobs")
+}
+
+// Sync operation tracking
+model SyncOperation {
+  id           String    @id @default(cuid())
+  direction    String // "pull", "push", "bidirectional"
+  strategy     String // "safe", "aggressive", "manual"
+  status       String    @default("pending") // "pending", "running", "completed", "failed", "cancelled"
+  progress     String // Progress tracking
+  result       String? // Sync result data
+  error        String?
+  config       String // Sync configuration
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relationships
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectionId  String
+  connection    AppIntegration @relation(fields: [connectionId], references: [id], onDelete: Cascade) 
+  initiatedBy   String
+  initiator     User @relation("InitiatedSyncs", fields: [initiatedBy], references: [id])
+
+  @@index([projectId, status])
+  @@index([connectionId])
+  @@map("sync_operations")
+}
+
+// Webhook subscription management
+model WebhookSubscription {
+  id            String   @id @default(cuid())
+  url           String
+  events        String   // JSON string of event types to subscribe to
+  headers       String   @default("{}")
+  secret        String?
+  enabled       Boolean  @default(true)
+  retryAttempts Int      @default(3)
+  lastDelivery  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy String
+  creator   User     @relation("CreatedWebhooks", fields: [createdBy], references: [id])
+
+  // Related deliveries
+  deliveries        WebhookDelivery[] @relation("WebhookDeliveries")
+  failedDeliveries  WebhookDelivery[] @relation("FailedWebhookDeliveries")
+
+  @@index([projectId, enabled])
+  @@index([enabled])
+  @@map("webhook_subscriptions")
+}
+
+// Webhook delivery tracking
+model WebhookDelivery {
+  id          String    @id @default(cuid())
+  url         String
+  payload     String
+  headers     String?
+  status      String    @default("pending") // "pending", "delivered", "failed"
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  response    String? // Response from webhook endpoint
+  error       String?
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relationships
+  eventType        String // "prompt_updated", "sync_completed", etc.
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  webhookId        String?
+  webhook          WebhookSubscription? @relation("WebhookDeliveries", fields: [webhookId], references: [id])
+  failedWebhookId  String?
+  failedWebhook    WebhookSubscription? @relation("FailedWebhookDeliveries", fields: [failedWebhookId], references: [id])
+
+  @@index([status, attempts])
+  @@index([eventType])
+  @@index([webhookId])
+  @@map("webhook_deliveries")
+}
+
+// API Keys management for LLM providers
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  provider   String // "openai", "groq", "anthropic", etc.
+  keyHash    String // Hashed version of the API key
+  isActive   Boolean   @default(true)
+  lastUsed   DateTime?
+  usageCount Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, provider])
+  @@map("api_keys")
+}
+
+// Deployment Management
+
+
+model Environment {
+  id          String          @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  config      String? // Environment-specific configuration
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relationships
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
+
+  @@unique([projectId, name])
+  @@index([projectId, type])
+  @@map("environments")
+}
+
+model Deployment {
+  id          String           @id @default(cuid())
+  version     String // Semantic version (e.g., "1.2.3")
+  status      String @default(PENDING)
+  deployedUrl String? // URL where the prompt is deployed
+  config      String? // Deployment-specific configuration
+  metadata    String? // Additional deployment metadata
+  deployedAt  DateTime?
+  rollbackAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relationships
+  promptId      String
+  prompt        Prompt      @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  environmentId String
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  deployedBy    String
+  deployedByUser User       @relation("DeployedBy", fields: [deployedBy], references: [id])
+  
+  // History tracking
+  history DeploymentHistory[]
+  
+  // Impact analysis
+  impactAnalysis ImpactAnalysis[]
+
+  @@index([promptId, environmentId])
+  @@index([status])
+  @@index([deployedBy])
+  @@map("deployments")
+}
+
+model DeploymentHistory {
+  id        String           @id @default(cuid())
+  action    String // "deploy", "rollback", "update", "deactivate"
+  status    String
+  metadata  String? // Action-specific metadata
+  timestamp DateTime         @default(now())
+
+  // Relationships
+  deploymentId String
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  performedBy  String
+  user         User       @relation("DeploymentActions", fields: [performedBy], references: [id])
+
+  @@index([deploymentId])
+  @@index([performedBy])
+  @@map("deployment_history")
+}
+
+// Impact Analysis for Deployment Changes
+model ImpactAnalysis {
+  id                String   @id @default(cuid())
+  impactPercentage  Float // Percentage of outputs that changed
+  diffAnalysis      String // Detailed diff analysis between versions
+  sampleComparisons String // Sample input/output comparisons
+  createdAt         DateTime @default(now())
+
+  // Relationships
+  deploymentId     String
+  deployment       Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  baselinePromptId String? // The prompt being compared against
+  baselinePrompt   Prompt?    @relation("ImpactBaseline", fields: [baselinePromptId], references: [id])
+
+  // Integration relationships
+  approvalRequests ApprovalRequest[]
+
+  @@index([deploymentId])
+  @@index([baselinePromptId])
+  @@map("impact_analysis")
+}
+
+// Cost Tracking and Billing
+model CostTracking {
+  id           String   @id @default(cuid())
+  period       String // "2024-01", "2024-02", etc.
+  totalCost    Float
+  tokenUsage   Int
+  requestCount Int
+  breakdown    String // Detailed cost breakdown by model, user, etc.
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?   @relation("UserCosts", fields: [userId], references: [id])
+
+  @@unique([projectId, userId, period])
+  @@index([projectId])
+  @@index([userId])
+  @@map("cost_tracking")
+}
+
+// User Billing Information
+model UserBilling {
+  id           String   @id @default(cuid())
+  billingEmail String?
+  plan         String   @default("free") // "free", "pro", "enterprise"
+  monthlyLimit Float    @default(0) // Monthly spending limit
+  currentUsage Float    @default(0) // Current month usage
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_billing")
+}
+
+// App Integration Management
+model AppIntegration {
+  id         String   @id @default(cuid())
+  name       String
+  type       String // "langsmith", "direct_api", "webhook"
+  baseUrl    String
+  apiKeyHash String // Hashed API key for security
+  syncConfig String // Sync configuration settings
+  isActive   Boolean  @default(true)
+  lastSync   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy String
+  creator   User    @relation("CreatedIntegrations", fields: [createdBy], references: [id])
+
+  // Related sync operations
+  syncOperations SyncOperation[]
+
+  @@index([projectId, type])
+  @@index([isActive])
+  @@map("app_integrations")
+}
+
+// Testing Pipeline Management
+model TestPipeline {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  config      String // Pipeline configuration
+  status      String   @default("DRAFT") // "DRAFT", "ACTIVE", "ARCHIVED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy String
+  creator   User    @relation("CreatedPipelines", fields: [createdBy], references: [id])
+
+  // Pipeline stages and executions
+  stages     PipelineStage[]
+  executions PipelineExecution[]
+
+  @@index([projectId, status])
+  @@map("test_pipelines")
+}
+
+model PipelineStage {
+  id        String   @id @default(cuid())
+  name      String
+  type      String // "validation", "performance", "quality", "comparison", "optimization"
+  config    String // Stage-specific configuration
+  order     Int
+  status    String   @default("PENDING") // "PENDING", "RUNNING", "COMPLETED", "FAILED"
+  result    String? // Stage execution result
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  pipelineId String
+  pipeline   TestPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId, order])
+  @@map("pipeline_stages")
+}
+
+model PipelineExecution {
+  id           String    @id @default(cuid())
+  status       String    @default("PENDING") // "PENDING", "RUNNING", "COMPLETED", "FAILED"
+  startedAt    DateTime?
+  completedAt  DateTime?
+  result       String? // Execution result
+  error        String? // Error message if failed
+  metadata     String? // Additional execution metadata
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relationships
+  pipelineId        String
+  pipeline          TestPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  promptId          String
+  prompt            Prompt       @relation("PipelinePrompts", fields: [promptId], references: [id])
+  baselinePromptId  String?
+  baselinePrompt    Prompt?      @relation("PipelineBaselines", fields: [baselinePromptId], references: [id])
+  executedBy        String
+  executor          User         @relation("ExecutedPipelines", fields: [executedBy], references: [id])
+
+  @@index([pipelineId, status])
+  @@index([promptId])
+  @@map("pipeline_executions")
+}
+
+// Dependency Management
+model Dependency {
+  id          String   @id @default(cuid())
+  name        String
+  type        String // "langsmith", "model_provider", "webhook", "database", "monitoring"
+  provider    String // "openai", "anthropic", "langchain", etc.
+  config      String // Dependency configuration (sanitized)
+  status      String   @default("ACTIVE") // "ACTIVE", "INACTIVE", "UNHEALTHY"
+  version     String?
+  healthScore Int      @default(100)
+  lastCheck   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy String
+  creator   User    @relation("CreatedDependencies", fields: [createdBy], references: [id])
+
+  @@index([projectId, type])
+  @@index([status])
+  @@map("dependencies")
+}
+
+model UpdatePlan {
+  id              String    @id @default(cuid())
+  planData        String // Complete update plan data
+  status          String    @default("DRAFT") // "DRAFT", "APPROVED", "EXECUTING", "COMPLETED", "FAILED"
+  executionResult String? // Results of plan execution
+  executedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relationships
+  projectId  String
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  String
+  creator    User    @relation("CreatedUpdatePlans", fields: [createdBy], references: [id])
+  executedBy String?
+  executor   User?   @relation("ExecutedUpdatePlans", fields: [executedBy], references: [id])
+
+  @@index([projectId, status])
+  @@map("update_plans")
+}
+
+// Safe Deployment Management
+model DeploymentPlan {
+  id        String   @id @default(cuid())
+  planData  String // Complete deployment plan
+  status    String   @default("DRAFT") // "DRAFT", "APPROVED", "ACTIVE", "ARCHIVED"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  promptId  String
+  prompt    Prompt  @relation("DeploymentPlans", fields: [promptId], references: [id])
+  createdBy String
+  creator   User    @relation("CreatedDeploymentPlans", fields: [createdBy], references: [id])
+
+  // Related executions and approvals
+  executions DeploymentExecution[]
+  approvals  DeploymentApproval[] @relation("PlanApprovals")
+
+  @@index([projectId, status])
+  @@index([promptId])
+  @@map("deployment_plans")
+}
+
+model DeploymentExecution {
+  id           String    @id @default(cuid())
+  status       String    @default("PENDING") // "PENDING", "RUNNING", "PAUSED", "COMPLETED", "FAILED", "ROLLING_BACK"
+  currentStage Int       @default(0)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  metrics      String? // Real-time metrics during deployment
+  error        String? // Error message if failed
+  metadata     String? // Additional execution metadata
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relationships
+  planId     String
+  plan       DeploymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  executedBy String
+  executor   User           @relation("ExecutedDeployments", fields: [executedBy], references: [id])
+
+  @@index([planId, status])
+  @@map("deployment_executions")
+}
+
+model DeploymentApproval {
+  id         String   @id @default(cuid())
+  status     String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  comments   String?
+  approvedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  planId     String
+  plan       DeploymentPlan @relation("PlanApprovals", fields: [planId], references: [id], onDelete: Cascade)
+  approvedBy String
+  approver   User           @relation("DeploymentApprovals", fields: [approvedBy], references: [id])
+
+  @@index([planId, status])
+  @@map("deployment_approvals")
+}
+
+// Approval Request Management
+model ApprovalRequest {
+  id                String   @id @default(cuid())
+  status            String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  metadata          String? // Request-specific metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  projectId         String
+  project           Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  promptId          String
+  prompt            Prompt       @relation("ApprovalRequests", fields: [promptId], references: [id])
+  appId             String
+  requestedBy       String
+  requester         User         @relation("RequestedApprovals", fields: [requestedBy], references: [id])
+  impactAnalysisId  String?
+  impactAnalysis    ImpactAnalysis? @relation(fields: [impactAnalysisId], references: [id])
+
+  @@index([projectId, status])
+  @@index([promptId])
+  @@map("approval_requests")
+}

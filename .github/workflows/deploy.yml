@@ -1,0 +1,212 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '18.x'
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.preview-url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "preview-url=$url" >> $GITHUB_OUTPUT
+
+      - name: Run smoke tests
+        run: |
+          npm ci
+          npm run test:smoke -- --url=${{ steps.deploy.outputs.preview-url }}
+
+      - name: Comment PR with staging URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 Staging deployment: ${{ steps.deploy.outputs.preview-url }}'
+            })
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment:
+      name: production
+      url: https://prompt-testing-lab.vercel.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "production-url=$url" >> $GITHUB_OUTPUT
+
+      - name: Create deployment record
+        run: |
+          echo "Deployment Details:" > deployment-log.txt
+          echo "Date: $(date -u)" >> deployment-log.txt
+          echo "Commit: ${{ github.sha }}" >> deployment-log.txt
+          echo "URL: ${{ steps.deploy.outputs.production-url }}" >> deployment-log.txt
+          echo "Tag: ${{ github.ref_name }}" >> deployment-log.txt
+
+      - name: Run production health checks
+        run: |
+          npm ci
+          npm run test:health -- --url=${{ steps.deploy.outputs.production-url }}
+
+      - name: Create rollback script
+        run: |
+          mkdir -p scripts/rollback
+          cat > scripts/rollback/rollback-${{ github.run_number }}.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          echo "Rolling back deployment ${{ github.run_number }}"
+          
+          # Get previous deployment
+          PREV_DEPLOYMENT=$(vercel ls --token=${{ secrets.VERCEL_TOKEN }} | grep production | head -2 | tail -1 | awk '{print $1}')
+          
+          if [ -z "$PREV_DEPLOYMENT" ]; then
+            echo "No previous deployment found"
+            exit 1
+          fi
+          
+          # Promote previous deployment
+          vercel promote $PREV_DEPLOYMENT --token=${{ secrets.VERCEL_TOKEN }}
+          
+          echo "Rollback completed. Previous deployment $PREV_DEPLOYMENT is now active."
+          EOF
+          chmod +x scripts/rollback/rollback-${{ github.run_number }}.sh
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-logs-${{ github.run_number }}
+          path: |
+            deployment-log.txt
+            scripts/rollback/rollback-${{ github.run_number }}.sh
+          retention-days: 90
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create database backup
+        run: |
+          npm run db:backup -- --env=production
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Run database migrations
+        run: |
+          npm run db:migrate -- --env=production
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Verify migration
+        run: |
+          npm run db:verify -- --env=production
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  cleanup:
+    name: Cleanup Old Deployments
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always()
+
+    steps:
+      - name: Cleanup old Vercel deployments
+        run: |
+          vercel ls --token=${{ secrets.VERCEL_TOKEN }} | \
+          grep -v production | \
+          tail -n +10 | \
+          awk '{print $1}' | \
+          xargs -I {} vercel rm {} --yes --token=${{ secrets.VERCEL_TOKEN }} || true

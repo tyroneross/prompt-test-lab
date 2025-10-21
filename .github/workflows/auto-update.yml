@@ -1,0 +1,163 @@
+name: Auto Update Dependencies
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 6 AM UTC
+  workflow_dispatch:
+
+jobs:
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: Update npm dependencies
+        run: |
+          npm update
+          npm audit fix --force
+
+      - name: Update Playwright browsers
+        run: |
+          npm ci
+          npx playwright install
+
+      - name: Run tests after update
+        run: |
+          npm run test
+          npm run test:e2e
+        continue-on-error: true
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet package*.json; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.has-changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          title: 'chore: weekly dependency updates'
+          body: |
+            ## Automated Dependency Updates
+            
+            This PR contains weekly dependency updates:
+            - Updated npm packages to latest versions
+            - Applied security patches via npm audit fix
+            - Updated Playwright browsers
+            
+            **Testing Status:**
+            - Unit tests: ${{ job.status }}
+            - E2E tests: ${{ job.status }}
+            
+            Please review the changes and merge if tests pass.
+          branch: chore/dependency-updates
+          delete-branch: true
+
+  update-github-actions:
+    name: Update GitHub Actions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update GitHub Actions
+        uses: technote-space/create-pr-action@v2
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXECUTE_COMMANDS: |
+            find .github/workflows -name "*.yml" -exec sed -i 's/@v[0-9]*/@v4/g' {} \;
+          COMMIT_MESSAGE: 'chore: update GitHub Actions to latest versions'
+          PR_TITLE: 'chore: update GitHub Actions versions'
+          PR_BODY: |
+            Automated update of GitHub Actions to latest major versions.
+            
+            This ensures we're using the most recent stable versions with security patches.
+
+  security-updates:
+    name: Security Updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for security vulnerabilities
+        run: |
+          npm audit --audit-level=moderate --json > audit.json || true
+          cat audit.json
+
+      - name: Apply security fixes
+        run: npm audit fix --force
+
+      - name: Run tests after security fixes
+        run: |
+          npm run test
+        continue-on-error: true
+
+      - name: Check for security changes
+        id: security-changes
+        run: |
+          if git diff --quiet package*.json; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Security PR
+        if: steps.security-changes.outputs.has-changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'security: apply automated security fixes'
+          title: 'security: automated security updates'
+          body: |
+            ## Automated Security Updates
+            
+            This PR contains automated security fixes:
+            - Applied npm audit fixes
+            - Updated vulnerable dependencies
+            
+            **Security Report:**
+            See audit.json for details of vulnerabilities addressed.
+            
+            **Testing Status:**
+            - Unit tests: ${{ job.status }}
+            
+            **Priority:** High - Contains security fixes
+          branch: security/automated-fixes
+          delete-branch: true
+          labels: |
+            security
+            automated
+            high-priority

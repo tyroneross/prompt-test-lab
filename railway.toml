@@ -1,0 +1,29 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm install && pnpm build:api"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "api"
+source = "packages/api"
+
+[services.env]
+NODE_ENV = "production"
+PORT = { default = "8080" }
+
+[services.healthcheck]
+path = "/health"
+port = { default = "8080" }
+
+[[services]]
+name = "postgres"
+plugin = "postgresql"
+
+[services.env]
+POSTGRES_DB = "prompt_testing_lab"
+POSTGRES_USER = "postgres"

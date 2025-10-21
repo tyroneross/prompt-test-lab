@@ -1,0 +1,49 @@
+{
+  "name": "prompt-testing-lab",
+  "version": "1.0.0",
+  "description": "Modular prompt testing and optimization service",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "predev": "node ./scripts/dev-doctor.mjs --predev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:doctor": "node ./scripts/dev-doctor.mjs",
+    "dev:safe": "node ./scripts/dev-doctor.mjs --autofix && corepack enable && pnpm -v || true; npm run dev",
+    "dev:api": "npm run dev --workspace=@prompt-lab/api",
+    "dev:web": "npm run dev --workspace=@prompt-lab/web",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "test:setup": "cp .env.test.example .env.test",
+    "test:e2e": "NODE_ENV=test playwright test tests/e2e/",
+    "test:performance": "NODE_ENV=test playwright test tests/performance/",
+    "test:security": "NODE_ENV=test playwright test tests/security/",
+    "test:accessibility": "NODE_ENV=test playwright test tests/accessibility/",
+    "test:all": "NODE_ENV=test playwright test",
+    "security:scan": "./scripts/security-scan.sh",
+    "db:init": "npm run db:init --workspace=@prompt-lab/api",
+    "db:migrate": "npm run db:migrate --workspace=@prompt-lab/api",
+    "db:seed": "npm run db:seed --workspace=@prompt-lab/api",
+    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.8.4",
+    "@playwright/test": "^1.41.0",
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "allure-playwright": "^2.10.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.56.0",
+    "lighthouse": "^11.7.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

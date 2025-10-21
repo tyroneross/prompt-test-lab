@@ -1,0 +1,42 @@
+# =============================================================================
+# Terraform Variables Configuration
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your actual values
+# Never commit terraform.tfvars to version control
+
+# Environment Configuration
+environment = "production"
+aws_region  = "us-east-1"
+
+# GitHub Repository
+github_repo = "your-username/prompt-testing-lab"
+
+# Vercel Configuration
+vercel_api_token = "your-vercel-api-token"
+
+# Supabase Configuration
+supabase_access_token = "your-supabase-access-token"
+supabase_org_id      = "your-supabase-org-id"
+supabase_db_password = "your-secure-database-password"
+
+# Authentication
+nextauth_secret = "your-32-character-nextauth-secret-here"
+
+# LLM Providers
+openai_api_key = "your-openai-api-key"
+groq_api_key   = "your-groq-api-key"
+
+# GitHub OAuth
+github_oauth_id     = "your-github-oauth-app-id"
+github_oauth_secret = "your-github-oauth-app-secret"
+
+# Optional Features
+enable_cdn        = false
+enable_monitoring = true
+
+# Retention Policies
+backup_retention_days = 30
+log_retention_days   = 30
+
+# Alerting
+alert_email = "your-email@example.com"

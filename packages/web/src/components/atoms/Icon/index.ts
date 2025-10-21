@@ -1,0 +1,1 @@
+export { Icon, iconMap, type IconProps, type IconName } from './Icon';

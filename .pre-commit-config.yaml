@@ -1,0 +1,190 @@
+# Pre-commit hooks configuration for Prompt Testing Lab
+# Install with: pip install pre-commit && pre-commit install
+
+repos:
+  # Basic code quality checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(md|rst)$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # TypeScript/JavaScript linting
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: npm run lint
+        language: system
+        files: \.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: typescript-check
+        name: TypeScript Type Check
+        entry: npm run type-check
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+  # Prettier code formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        additional_dependencies:
+          - prettier@3.1.0
+          - "@prettier/plugin-xml@3.2.2"
+        exclude: |
+          (?x)^(
+            \.md|
+            \.mdx|
+            package-lock\.json|
+            pnpm-lock\.yaml
+          )$
+
+  # Security checks
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            \.env\.example|
+            \.secrets\.baseline|
+            package-lock\.json|
+            pnpm-lock\.yaml
+          )$
+
+  # GitLeaks for secret detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: [--ignore, DL3008, --ignore, DL3009]
+
+  # Docker Compose validation
+  - repo: local
+    hooks:
+      - id: docker-compose-check
+        name: Docker Compose Check
+        entry: docker-compose config -q
+        language: system
+        files: docker-compose.*\.yml$
+        pass_filenames: false
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: [--severity=warning]
+
+  # Terraform validation
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.86.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+        args:
+          - --init-args=-backend=false
+      - id: terraform_tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+      - id: terraform_checkov
+        args:
+          - --args=--framework terraform
+          - --args=--skip-check CKV_AWS_79,CKV_AWS_61
+
+  # Commit message validation
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]
+
+  # Custom hooks for project-specific checks
+  - repo: local
+    hooks:
+      - id: no-console-log
+        name: No console.log
+        entry: 'console\.(log|warn|error|info|debug)'
+        language: pygrep
+        files: \.(ts|tsx|js|jsx)$
+        args: [--multiline]
+
+      - id: no-debugger
+        name: No debugger statements
+        entry: 'debugger'
+        language: pygrep
+        files: \.(ts|tsx|js|jsx)$
+
+      - id: no-todo-fixme
+        name: No TODO/FIXME in production
+        entry: '(TODO|FIXME|XXX|HACK)'
+        language: pygrep
+        files: \.(ts|tsx|js|jsx)$
+        exclude: |
+          (?x)^(
+            .*\.test\.|
+            .*\.spec\.|
+            packages/.*/__tests__/.*
+          )$
+
+      - id: package-json-version-sync
+        name: Package.json version sync
+        entry: scripts/check-package-versions.sh
+        language: script
+        files: package\.json$
+        pass_filenames: false
+
+      - id: env-example-sync
+        name: Environment example sync
+        entry: scripts/check-env-sync.sh
+        language: script
+        files: \.(env|env\.example)$
+        pass_filenames: false
+
+  # Database migration checks
+  - repo: local
+    hooks:
+      - id: prisma-generate
+        name: Prisma Generate
+        entry: npm run db:generate
+        language: system
+        files: packages/api/prisma/schema\.prisma$
+        pass_filenames: false
+
+      - id: migration-check
+        name: Database Migration Check
+        entry: scripts/check-migrations.sh
+        language: script
+        files: packages/api/prisma/.*
+        pass_filenames: false
+
+# Global configuration
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'

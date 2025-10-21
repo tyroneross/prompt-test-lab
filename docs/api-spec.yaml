@@ -1,0 +1,1652 @@
+openapi: 3.0.0
+info:
+  title: Prompt Testing Lab API
+  version: 1.0.0
+  description: |
+    Enterprise-grade A/B testing platform for LLM prompts. 
+    
+    This API enables organizations to systematically test, compare, and optimize their AI prompts across multiple providers, reducing costs while improving output quality and consistency.
+    
+    ## Authentication
+    All endpoints require a valid JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    ## Rate Limits
+    - Free tier: 1,000 requests/hour
+    - Pro tier: 10,000 requests/hour
+    - Enterprise: Custom limits
+    
+    ## Error Handling
+    The API uses conventional HTTP response codes to indicate success or failure. Error responses include detailed error messages and error codes for programmatic handling.
+    
+  contact:
+    name: Prompt Testing Lab Support
+    url: https://promptlab.ai/support
+    email: support@promptlab.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.promptlab.ai/v1
+    description: Production server
+  - url: https://staging-api.promptlab.ai/v1
+    description: Staging server
+  - url: http://localhost:8001/api
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Authentication Endpoints
+  /auth/register:
+    post:
+      summary: Register new user
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - name
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "SecurePass123!"
+                name:
+                  type: string
+                  minLength: 2
+                  example: "John Doe"
+      responses:
+        201:
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        409:
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: Authenticate user
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        200:
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthResponse'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      summary: Refresh authentication token
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        200:
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthResponse'
+
+  /auth/me:
+    get:
+      summary: Get current user profile
+      tags:
+        - Authentication
+      responses:
+        200:
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+  # Project Management
+  /projects:
+    get:
+      summary: List user's projects
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: search
+          in: query
+          description: Search projects by name
+          schema:
+            type: string
+      responses:
+        200:
+          description: Projects retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Project'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+    post:
+      summary: Create new project
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        201:
+          description: Project created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Project'
+
+  /projects/{projectId}:
+    get:
+      summary: Get project details
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      responses:
+        200:
+          description: Project retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProjectDetails'
+
+    put:
+      summary: Update project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        200:
+          description: Project updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Project'
+
+    delete:
+      summary: Delete project
+      tags:
+        - Projects
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      responses:
+        204:
+          description: Project deleted successfully
+        403:
+          $ref: '#/components/responses/Forbidden'
+
+  # Prompt Management
+  /projects/{projectId}/prompts:
+    get:
+      summary: List project prompts
+      tags:
+        - Prompts
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: tag
+          in: query
+          description: Filter by tag
+          schema:
+            type: string
+        - name: version
+          in: query
+          description: Filter by version
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Prompts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Prompt'
+
+    post:
+      summary: Create new prompt
+      tags:
+        - Prompts
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptCreate'
+      responses:
+        201:
+          description: Prompt created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Prompt'
+
+  /prompts/{promptId}:
+    get:
+      summary: Get prompt details
+      tags:
+        - Prompts
+      parameters:
+        - $ref: '#/components/parameters/PromptIdParam'
+      responses:
+        200:
+          description: Prompt retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PromptDetails'
+
+    put:
+      summary: Update prompt
+      tags:
+        - Prompts
+      parameters:
+        - $ref: '#/components/parameters/PromptIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptUpdate'
+      responses:
+        200:
+          description: Prompt updated successfully
+
+  /prompts/{promptId}/versions:
+    get:
+      summary: Get prompt version history
+      tags:
+        - Prompts
+      parameters:
+        - $ref: '#/components/parameters/PromptIdParam'
+      responses:
+        200:
+          description: Version history retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromptVersion'
+
+    post:
+      summary: Create new prompt version
+      tags:
+        - Prompts
+      parameters:
+        - $ref: '#/components/parameters/PromptIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptVersionCreate'
+      responses:
+        201:
+          description: New version created
+
+  # Test Execution
+  /projects/{projectId}/test-runs:
+    get:
+      summary: List project test runs
+      tags:
+        - Testing
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            $ref: '#/components/schemas/TestRunStatus'
+      responses:
+        200:
+          description: Test runs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TestRun'
+
+    post:
+      summary: Create and start test run
+      tags:
+        - Testing
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestRunCreate'
+      responses:
+        201:
+          description: Test run created and started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TestRun'
+
+  /test-runs/{testRunId}:
+    get:
+      summary: Get test run details
+      tags:
+        - Testing
+      parameters:
+        - $ref: '#/components/parameters/TestRunIdParam'
+      responses:
+        200:
+          description: Test run details retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TestRunDetails'
+
+  /test-runs/{testRunId}/progress:
+    get:
+      summary: Get test run progress
+      tags:
+        - Testing
+      parameters:
+        - $ref: '#/components/parameters/TestRunIdParam'
+      responses:
+        200:
+          description: Progress retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TestProgress'
+
+  /test-runs/{testRunId}/comparison:
+    get:
+      summary: Get model comparison results
+      tags:
+        - Testing
+      parameters:
+        - $ref: '#/components/parameters/TestRunIdParam'
+      responses:
+        200:
+          description: Comparison results retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ComparisonResults'
+
+  /test-runs/{testRunId}/cancel:
+    post:
+      summary: Cancel test run
+      tags:
+        - Testing
+      parameters:
+        - $ref: '#/components/parameters/TestRunIdParam'
+      responses:
+        200:
+          description: Test run cancelled successfully
+
+  # Analytics
+  /projects/{projectId}/analytics:
+    get:
+      summary: Get project analytics
+      tags:
+        - Analytics
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+        - name: period
+          in: query
+          description: Time period for analytics
+          schema:
+            type: string
+            enum: [1d, 7d, 30d, 90d, 1y]
+            default: 7d
+        - name: groupBy
+          in: query
+          description: Group results by dimension
+          schema:
+            type: string
+            enum: [model, prompt, day, hour]
+      responses:
+        200:
+          description: Analytics data retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AnalyticsData'
+
+  /projects/{projectId}/cost-data:
+    get:
+      summary: Get project cost data
+      tags:
+        - Analytics
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [current, last30, last90]
+            default: current
+      responses:
+        200:
+          description: Cost data retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CostData'
+
+  # Deployment Management
+  /projects/{projectId}/deployments:
+    get:
+      summary: List project deployments
+      tags:
+        - Deployments
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+        - name: environment
+          in: query
+          schema:
+            type: string
+            enum: [staging, production]
+      responses:
+        200:
+          description: Deployments retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deployment'
+
+    post:
+      summary: Create deployment
+      tags:
+        - Deployments
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentCreate'
+      responses:
+        201:
+          description: Deployment created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Deployment'
+
+  /deployments/{deploymentId}:
+    get:
+      summary: Get deployment details
+      tags:
+        - Deployments
+      parameters:
+        - $ref: '#/components/parameters/DeploymentIdParam'
+      responses:
+        200:
+          description: Deployment details retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeploymentDetails'
+
+  /deployments/{deploymentId}/rollback:
+    post:
+      summary: Rollback deployment
+      tags:
+        - Deployments
+      parameters:
+        - $ref: '#/components/parameters/DeploymentIdParam'
+      responses:
+        200:
+          description: Rollback initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Deployment'
+
+  # Impact Analysis
+  /projects/{projectId}/impact-analysis:
+    post:
+      summary: Perform impact analysis
+      tags:
+        - Analysis
+      parameters:
+        - $ref: '#/components/parameters/ProjectIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImpactAnalysisRequest'
+      responses:
+        201:
+          description: Impact analysis started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImpactAnalysisResult'
+
+  # Health Check
+  /health:
+    get:
+      summary: Health check endpoint
+      tags:
+        - System
+      security: []
+      responses:
+        200:
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "connected"
+                      redis:
+                        type: string
+                        example: "connected"
+                      queue:
+                        type: string
+                        example: "active"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProjectIdParam:
+      name: projectId
+      in: path
+      required: true
+      description: Unique identifier for the project
+      schema:
+        type: string
+        format: uuid
+
+    PromptIdParam:
+      name: promptId
+      in: path
+      required: true
+      description: Unique identifier for the prompt
+      schema:
+        type: string
+        format: uuid
+
+    TestRunIdParam:
+      name: testRunId
+      in: path
+      required: true
+      description: Unique identifier for the test run
+      schema:
+        type: string
+        format: uuid
+
+    DeploymentIdParam:
+      name: deploymentId
+      in: path
+      required: true
+      description: Unique identifier for the deployment
+      schema:
+        type: string
+        format: uuid
+
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    # Common Response Schemas
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "Invalid input data"
+            details:
+              type: object
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+        totalPages:
+          type: integer
+          example: 5
+
+    # Authentication Schemas
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: Refresh token for getting new access tokens
+        expiresIn:
+          type: integer
+          description: Token expiration time in seconds
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+        avatar:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+
+    # Project Schemas
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        ownerId:
+          type: string
+          format: uuid
+        settings:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProjectDetails:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            members:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectMember'
+            stats:
+              type: object
+              properties:
+                totalPrompts:
+                  type: integer
+                totalTestRuns:
+                  type: integer
+                totalMembers:
+                  type: integer
+
+    ProjectMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        user:
+          $ref: '#/components/schemas/User'
+        joinedAt:
+          type: string
+          format: date-time
+
+    ProjectCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        settings:
+          type: object
+          properties:
+            defaultModelConfig:
+              $ref: '#/components/schemas/ModelConfig'
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        settings:
+          type: object
+
+    # Prompt Schemas
+    Prompt:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        template:
+          type: string
+        version:
+          type: integer
+        parentPromptId:
+          type: string
+          format: uuid
+        modelConfig:
+          $ref: '#/components/schemas/ModelConfig'
+        tags:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    PromptDetails:
+      allOf:
+        - $ref: '#/components/schemas/Prompt'
+        - type: object
+          properties:
+            versions:
+              type: array
+              items:
+                $ref: '#/components/schemas/PromptVersion'
+            recentTestRuns:
+              type: array
+              items:
+                $ref: '#/components/schemas/TestRun'
+
+    PromptVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        template:
+          type: string
+        changes:
+          type: string
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    PromptCreate:
+      type: object
+      required:
+        - name
+        - template
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        template:
+          type: string
+          minLength: 1
+        modelConfig:
+          $ref: '#/components/schemas/ModelConfig'
+        tags:
+          type: array
+          items:
+            type: string
+
+    PromptUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        template:
+          type: string
+        modelConfig:
+          $ref: '#/components/schemas/ModelConfig'
+        tags:
+          type: array
+          items:
+            type: string
+
+    PromptVersionCreate:
+      type: object
+      required:
+        - template
+      properties:
+        template:
+          type: string
+        changes:
+          type: string
+        modelConfig:
+          $ref: '#/components/schemas/ModelConfig'
+
+    # Model Configuration Schema
+    ModelConfig:
+      type: object
+      required:
+        - provider
+        - modelName
+      properties:
+        provider:
+          type: string
+          enum: [openai, anthropic, groq, local]
+        modelName:
+          type: string
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        maxTokens:
+          type: integer
+          minimum: 1
+          maximum: 32000
+        topP:
+          type: number
+          minimum: 0
+          maximum: 1
+        frequencyPenalty:
+          type: number
+          minimum: -2
+          maximum: 2
+        presencePenalty:
+          type: number
+          minimum: -2
+          maximum: 2
+        systemMessage:
+          type: string
+        customEndpoint:
+          type: string
+          format: uri
+
+    # Test Execution Schemas
+    TestRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/TestRunStatus'
+        progress:
+          $ref: '#/components/schemas/TestProgress'
+        config:
+          type: object
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    TestRunStatus:
+      type: string
+      enum: [pending, queued, running, completed, failed, cancelled]
+
+    TestRunDetails:
+      allOf:
+        - $ref: '#/components/schemas/TestRun'
+        - type: object
+          properties:
+            prompts:
+              type: array
+              items:
+                $ref: '#/components/schemas/Prompt'
+            results:
+              $ref: '#/components/schemas/TestResults'
+            comparison:
+              $ref: '#/components/schemas/ComparisonResults'
+
+    TestProgress:
+      type: object
+      properties:
+        completed:
+          type: integer
+        total:
+          type: integer
+        percentage:
+          type: number
+          minimum: 0
+          maximum: 100
+        currentPrompt:
+          type: string
+        estimatedTimeRemaining:
+          type: integer
+          description: Estimated seconds remaining
+
+    TestRunCreate:
+      type: object
+      required:
+        - promptIds
+        - testInputs
+      properties:
+        name:
+          type: string
+        promptIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 2
+          maxItems: 10
+        testInputs:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 1000
+        evaluationCriteria:
+          type: array
+          items:
+            type: string
+            enum: [relevance, accuracy, tone, sentiment, toxicity, similarity]
+        modelConfigs:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ModelConfig'
+        options:
+          type: object
+          properties:
+            concurrency:
+              type: integer
+              minimum: 1
+              maximum: 10
+              default: 3
+            timeout:
+              type: integer
+              minimum: 5000
+              maximum: 120000
+              default: 30000
+
+    TestResults:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalTests:
+              type: integer
+            successfulTests:
+              type: integer
+            failedTests:
+              type: integer
+            avgExecutionTime:
+              type: number
+            totalCost:
+              type: number
+        winner:
+          type: object
+          properties:
+            promptId:
+              type: string
+              format: uuid
+            score:
+              type: number
+            improvement:
+              type: number
+              description: Percentage improvement over baseline
+        responses:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestResponse'
+
+    TestResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        promptId:
+          type: string
+          format: uuid
+        input:
+          type: string
+        output:
+          type: string
+        modelProvider:
+          type: string
+        modelName:
+          type: string
+        tokenUsage:
+          $ref: '#/components/schemas/TokenUsage'
+        latencyMs:
+          type: integer
+        cost:
+          type: number
+        evaluationScores:
+          type: object
+          additionalProperties:
+            type: number
+        error:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TokenUsage:
+      type: object
+      properties:
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        totalTokens:
+          type: integer
+
+    ComparisonResults:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              model:
+                type: string
+              promptId:
+                type: string
+                format: uuid
+              metrics:
+                type: object
+                properties:
+                  avgLatency:
+                    type: number
+                  totalCost:
+                    type: number
+                  errorRate:
+                    type: number
+                  successRate:
+                    type: number
+                  avgScore:
+                    type: number
+                  responses:
+                    type: integer
+        winner:
+          type: object
+          properties:
+            model:
+              type: string
+            promptId:
+              type: string
+              format: uuid
+            improvement:
+              type: number
+
+    # Analytics Schemas
+    AnalyticsData:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+        metrics:
+          type: object
+          properties:
+            totalTestRuns:
+              type: integer
+            totalPrompts:
+              type: integer
+            avgExecutionTime:
+              type: number
+            totalCost:
+              type: number
+            successRate:
+              type: number
+        trends:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              testRuns:
+                type: integer
+              cost:
+                type: number
+              avgLatency:
+                type: number
+
+    CostData:
+      type: object
+      properties:
+        current:
+          type: object
+          properties:
+            thisMonth:
+              type: number
+            limit:
+              type: number
+            percentage:
+              type: number
+        breakdown:
+          type: object
+          properties:
+            byModel:
+              type: object
+              additionalProperties:
+                type: number
+            byProject:
+              type: object
+              additionalProperties:
+                type: number
+            byUser:
+              type: object
+              additionalProperties:
+                type: number
+        forecast:
+          type: object
+          properties:
+            endOfMonth:
+              type: number
+            trend:
+              type: string
+              enum: [increasing, decreasing, stable]
+
+    # Deployment Schemas
+    Deployment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        promptId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        environment:
+          type: string
+          enum: [staging, production]
+        version:
+          type: string
+        status:
+          type: string
+          enum: [pending, deploying, active, inactive, failed, rolled_back]
+        deployedUrl:
+          type: string
+          format: uri
+        config:
+          type: object
+        deployedBy:
+          type: string
+          format: uuid
+        deployedAt:
+          type: string
+          format: date-time
+        rollbackAt:
+          type: string
+          format: date-time
+
+    DeploymentDetails:
+      allOf:
+        - $ref: '#/components/schemas/Deployment'
+        - type: object
+          properties:
+            prompt:
+              $ref: '#/components/schemas/Prompt'
+            history:
+              type: array
+              items:
+                $ref: '#/components/schemas/DeploymentHistory'
+            impactAnalysis:
+              $ref: '#/components/schemas/ImpactAnalysisResult'
+
+    DeploymentHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [deploy, rollback, update, deactivate]
+        status:
+          type: string
+        metadata:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        performedBy:
+          type: string
+          format: uuid
+
+    DeploymentCreate:
+      type: object
+      required:
+        - promptId
+        - environment
+      properties:
+        promptId:
+          type: string
+          format: uuid
+        environment:
+          type: string
+          enum: [staging, production]
+        version:
+          type: string
+        config:
+          type: object
+        metadata:
+          type: object
+
+    # Impact Analysis Schemas
+    ImpactAnalysisRequest:
+      type: object
+      required:
+        - promptId
+        - baselinePromptId
+      properties:
+        promptId:
+          type: string
+          format: uuid
+        baselinePromptId:
+          type: string
+          format: uuid
+        sampleInputs:
+          type: array
+          items:
+            type: string
+        modelConfig:
+          $ref: '#/components/schemas/ModelConfig'
+
+    ImpactAnalysisResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        impactPercentage:
+          type: number
+          description: Percentage of responses that changed
+        diffAnalysis:
+          type: object
+          properties:
+            added:
+              type: array
+              items:
+                type: string
+            removed:
+              type: array
+              items:
+                type: string
+            modified:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  oldValue:
+                    type: string
+                  newValue:
+                    type: string
+        sampleComparisons:
+          type: array
+          items:
+            type: object
+            properties:
+              input:
+                type: string
+              currentOutput:
+                type: string
+              newOutput:
+                type: string
+              score:
+                type: number
+        createdAt:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per hour
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Time when rate limit resets
+          schema:
+            type: integer
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

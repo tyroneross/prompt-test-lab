@@ -21,6 +21,7 @@ import { websocketService } from './services/websocket.service';
 // Route imports
 import authRoutes from './routes/auth';
 import magicLinkRoutes from './routes/magic-link';
+import passwordRoutes from './routes/password';
 import projectRoutes from './routes/projects';
 import promptRoutes from './routes/prompts';
 import testRunRoutes from './routes/test-runs';
@@ -59,6 +60,7 @@ app.use('/health', healthRoutes);
 // Authentication routes (no auth required)
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/magic-link', magicLinkRoutes);
+app.use('/api/auth', passwordRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/projects', projectRoutes);

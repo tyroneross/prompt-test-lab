@@ -68,38 +68,31 @@ export const authApi = {
 
   /**
    * Update user profile
-   * @deprecated Backend endpoint not yet implemented - PATCH /auth/me needed
    */
   updateProfile: async (updates: Partial<User>): Promise<User> => {
-    // TODO: Backend needs to implement PATCH /auth/me endpoint
-    throw new Error('Profile update endpoint not yet implemented in backend');
+    const response = await apiClient.patch<ApiResponse<User>>('/auth/me', updates);
+    return response.data!;
   },
 
   /**
    * Change password
-   * @deprecated Backend endpoint not yet implemented - POST /auth/change-password needed
    */
   changePassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
-    // TODO: Backend needs to implement POST /auth/change-password endpoint
-    throw new Error('Change password endpoint not yet implemented in backend');
+    await apiClient.post('/auth/change-password', data);
   },
 
   /**
    * Request password reset
-   * @deprecated Backend endpoint not yet implemented - POST /auth/reset-password needed
    */
   requestPasswordReset: async (email: string): Promise<void> => {
-    // TODO: Backend needs to implement POST /auth/reset-password endpoint
-    throw new Error('Password reset endpoint not yet implemented in backend');
+    await apiClient.post('/auth/reset-password', { email });
   },
 
   /**
    * Reset password with token
-   * @deprecated Backend endpoint not yet implemented - POST /auth/reset-password/confirm needed
    */
-  resetPassword: async (data: { token: string; password: string }): Promise<void> => {
-    // TODO: Backend needs to implement POST /auth/reset-password/confirm endpoint
-    throw new Error('Password reset confirmation endpoint not yet implemented in backend');
+  resetPassword: async (data: { token: string; newPassword: string; email: string }): Promise<void> => {
+    await apiClient.post('/auth/reset-password/confirm', data);
   },
 
   /**

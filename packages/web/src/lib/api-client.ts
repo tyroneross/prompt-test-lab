@@ -69,17 +69,39 @@ export class ApiClient {
    * Build URL with query parameters
    */
   private buildURL(endpoint: string, params?: Record<string, any>): string {
-    const url = new URL(`${this.baseURL}${endpoint}`);
-    
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          url.searchParams.append(key, String(value));
+    // For relative paths, build URL manually to avoid new URL() issues in browser
+    let url: string;
+
+    if (this.baseURL.startsWith('http')) {
+      // Absolute URL - use new URL()
+      const urlObj = new URL(`${this.baseURL}${endpoint}`);
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            urlObj.searchParams.append(key, String(value));
+          }
+        });
+      }
+      url = urlObj.toString();
+    } else {
+      // Relative URL - build manually
+      url = `${this.baseURL}${endpoint}`;
+
+      if (params) {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            searchParams.append(key, String(value));
+          }
+        });
+        const queryString = searchParams.toString();
+        if (queryString) {
+          url += `?${queryString}`;
         }
-      });
+      }
     }
 
-    return url.toString();
+    return url;
   }
 
   /**

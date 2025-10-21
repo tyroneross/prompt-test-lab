@@ -263,4 +263,50 @@ export class AuthService {
       }
     });
   }
+
+  /**
+   * Update user profile
+   */
+  static async updateUserProfile(userId: string, updates: { name?: string; avatar?: string | null }) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: updates,
+    });
+  }
+
+  /**
+   * Change user password
+   */
+  static async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    // Get user with password hash
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AuthenticationError('User not found');
+    }
+
+    if (!user.passwordHash) {
+      throw new AuthenticationError('Password-based authentication not set up. Please use magic link authentication.');
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValidPassword) {
+      throw new AuthenticationError('Current password is incorrect');
+    }
+
+    // Validate new password
+    passwordSchema.parse(newPassword);
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
+  }
 }

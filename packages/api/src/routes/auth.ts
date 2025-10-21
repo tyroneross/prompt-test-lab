@@ -112,6 +112,68 @@ router.get('/me', authMiddleware, async (req: Request, res: Response, next: Next
 });
 
 /**
+ * PATCH /auth/me
+ * Update current user profile
+ */
+router.patch('/me', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      throw new AuthenticationError('User not authenticated');
+    }
+
+    const { name, avatar } = req.body;
+
+    // Validate updates
+    if (!name && !avatar) {
+      throw new ValidationError('At least one field (name or avatar) must be provided');
+    }
+
+    const updates: { name?: string; avatar?: string } = {};
+
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        throw new ValidationError('Name must be a non-empty string');
+      }
+      if (name.length > 100) {
+        throw new ValidationError('Name must be less than 100 characters');
+      }
+      updates.name = name.trim();
+    }
+
+    if (avatar !== undefined) {
+      if (typeof avatar !== 'string') {
+        throw new ValidationError('Avatar must be a string');
+      }
+      // Basic URL validation for avatar
+      if (avatar.length > 0 && !avatar.startsWith('http')) {
+        throw new ValidationError('Avatar must be a valid URL');
+      }
+      updates.avatar = avatar || null;
+    }
+
+    // Update user in database
+    const updatedUser = await AuthService.updateUserProfile(req.user.sub, updates);
+
+    if (!updatedUser) {
+      throw new AuthenticationError('User not found');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: nullToEmptyString(updatedUser.name),
+        avatar: nullToUndefined(updatedUser.avatar),
+      },
+      message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /auth/logout
  * Logout user (client-side token removal mainly)
  */
@@ -119,7 +181,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response, next:
   try {
     // In a stateless JWT system, logout is mainly handled client-side
     // In a more sophisticated system, you might maintain a token blacklist
-    
+
     res.json({
       success: true,
       message: 'Logout successful'
@@ -136,19 +198,19 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response, next:
 router.get('/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader) {
       throw new AuthenticationError('Authorization header missing');
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     if (!token) {
       throw new AuthenticationError('Token missing');
     }
 
     const user = await AuthService.verifyToken(token);
-    
+
     if (!user) {
       throw new AuthenticationError('Invalid token');
     }

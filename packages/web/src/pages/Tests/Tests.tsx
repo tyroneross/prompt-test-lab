@@ -22,9 +22,9 @@ const Tests: React.FC = () => {
       return;
     }
     markTestRun();
-    // Backend integration required - test creation UI exists but needs API
-    // For now, show a message that this is coming soon
-    alert('Test creation interface requires backend API integration. Coming soon!');
+    // TODO: Implement test creation form UI
+    // Backend API exists at POST /projects/:projectId/test-runs
+    alert('Test creation form is under development. Backend API is ready and waiting!');
   };
 
   const handleCreatePromptFirst = () => {

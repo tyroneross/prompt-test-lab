@@ -8,7 +8,6 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
 import { Button, Icon } from '@/components/atoms';
 import { Card, Metric, EmptyState } from '@/components/molecules';
 import { WelcomeOnboarding } from '@/components/organisms/WelcomeOnboarding';
@@ -138,19 +137,6 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Demo Mode Banner - Calm Precision Principle #9: Functional Integrity */}
-      <div className="border-2 border-amber-500 bg-amber-50 rounded-lg p-4">
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-700 flex-shrink-0" />
-          <div className="flex-1">
-            <h4 className="font-medium text-amber-900 mb-1">Demo Mode</h4>
-            <p className="text-sm text-amber-700">
-              You're viewing sample data. Connect to a backend to see real metrics and activity.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Dynamic header based on user experience */}
       <div className="flex items-center justify-between">
         <div>

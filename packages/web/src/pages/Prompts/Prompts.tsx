@@ -21,13 +21,14 @@ const Prompts: React.FC = () => {
 
   const handleCreatePrompt = () => {
     markPromptCreated();
-    // Backend integration required - prompt creation UI needs API
-    alert('Prompt creation interface requires backend API integration. Coming soon!');
+    // TODO: Implement prompt creation form UI
+    // Backend API exists at POST /projects/:projectId/prompts
+    alert('Prompt creation form is under development. Backend API is ready and waiting!');
   };
 
   const handleBrowseTemplates = () => {
-    // Templates feature - to be implemented with backend
-    alert('Template library requires backend integration. Coming soon!');
+    // TODO: Implement template library UI
+    alert('Template library UI is under development.');
   };
 
   return (

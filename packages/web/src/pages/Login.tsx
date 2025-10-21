@@ -9,9 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { Card } from '@/components/molecules/Card';
-import { Alert } from '@/components/atoms/Alert';
 import { toast } from 'sonner';
-import { Mail, AlertTriangle } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 export default function LoginPage() {
   const { requestMagicLink, isLoading, loginAsDemo } = useAuth();
@@ -78,18 +77,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Backend Not Ready Warning - Calm Precision Principle #9 */}
-        <Alert variant="warning">
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium">Magic link coming soon</p>
-              <p className="text-xs text-amber-700 mt-1">
-                Backend endpoints not yet implemented. Use demo mode to explore features.
-              </p>
-            </div>
-          </div>
-        </Alert>
 
         <Card padding="lg">
           {/* Magic Link Form */}

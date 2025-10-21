@@ -104,27 +104,17 @@ export const authApi = {
 
   /**
    * Request magic link for passwordless authentication
-   * @deprecated Backend endpoint not yet implemented - POST /auth/magic-link/send needed
    */
   requestMagicLink: async (email: string): Promise<void> => {
-    // TODO: Backend needs to implement POST /auth/magic-link/send endpoint
-    // Expected backend implementation:
-    // 1. Generate unique token
-    // 2. Store token with expiration (15 minutes)
-    // 3. Send email with magic link: /verify?token={token}&email={email}
-    throw new Error('Magic link endpoint not yet implemented in backend');
+    const response = await apiClient.post<ApiResponse<{ message: string; expiresInMinutes: number }>>('/auth/magic-link/send', { email });
+    console.log(`Magic link sent to ${email} - expires in ${response.data?.expiresInMinutes || 15} minutes`);
   },
 
   /**
    * Verify magic link token and authenticate user
-   * @deprecated Backend endpoint not yet implemented - GET /auth/magic-link/verify needed
    */
   verifyMagicLink: async (token: string, email: string): Promise<LoginResponse> => {
-    // TODO: Backend needs to implement GET /auth/magic-link/verify endpoint
-    // Expected backend implementation:
-    // 1. Validate token exists and not expired
-    // 2. Validate email matches token
-    // 3. Return user + JWT tokens (same as login)
-    throw new Error('Magic link verification endpoint not yet implemented in backend');
+    const response = await apiClient.get<ApiResponse<LoginResponse>>(`/auth/magic-link/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`);
+    return response.data!;
   },
 };

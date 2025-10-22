@@ -6,7 +6,15 @@
 
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Debug: Log API key (first/last 4 chars only for security)
+const apiKey = process.env.RESEND_API_KEY;
+if (apiKey) {
+  console.log(`🔑 Resend API Key loaded: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
+} else {
+  console.error('❌ RESEND_API_KEY not found in environment!');
+}
+
+const resend = new Resend(apiKey);
 
 export interface SendEmailOptions {
   to: string;
